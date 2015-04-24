@@ -9,13 +9,15 @@ use syntax::ptr::P;
 use syntax::util::small_vector::SmallVector;
 use syntax::codemap::respan;
 
+use util;
+
 #[derive(Debug)]
 enum Value {
     SingleValue(ast::Ident),
     MessageValue(Message),
 }
 #[derive(Debug)]
-struct Field(ast::Ident, Value);
+struct Field(Vec<ast::Ident>, Value);
 #[derive(Debug)]
 struct Message(Vec<Field>);
 
@@ -55,8 +57,20 @@ fn parse_value(parser: &mut Parser) -> PResult<Value> {
     }
 }
 
+fn parse_idents(parser: &mut Parser) -> PResult<Vec<ast::Ident>> {
+    let mut vec = Vec::new();
+
+    vec.push(try!(parser.parse_ident()));
+
+    while try!(parser.eat(&token::Dot)) {
+        vec.push(try!(parser.parse_ident()));
+    }
+
+    Ok(vec)
+}
+
 fn parse_field(parser: &mut Parser) -> PResult<Field> {
-    let ident = try!(parser.parse_ident());
+    let ident = try!(parse_idents(parser));
 
     match parser.token {
         token::Colon => {
@@ -107,13 +121,7 @@ fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field, parent: P<ast::Expr>) ->
         Value::SingleValue(ident) => {
             let pat = cx.pat_ident(sp, ident);
 
-            let f_get_xxx = cx.ident_of(&format!("get_{}", key));
-            let e = cx.expr_method_call(
-                sp,
-                parent,
-                f_get_xxx,
-                Vec::new()
-            );
+            let e = util::field_get(cx, sp, parent, &key, false);
 
             (pat, e)
         },
@@ -121,13 +129,7 @@ fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field, parent: P<ast::Expr>) ->
             let i_msg = cx.ident_of("msg");
             let e_msg = cx.expr_ident(sp, i_msg);
 
-            let f_get_xxx = cx.ident_of(&format!("get_{}", key));
-            let e = cx.expr_method_call(
-                sp,
-                parent,
-                f_get_xxx,
-                Vec::new()
-            );
+            let e = util::field_get(cx, sp, parent, &key, false);
 
             let stmts = vec![
                 cx.stmt_let(sp, false, i_msg, e)

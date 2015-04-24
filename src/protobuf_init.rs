@@ -7,6 +7,8 @@ use syntax::parse::{token,PResult};
 use syntax::parse::parser::Parser;
 use syntax::ptr::P;
 
+use util;
+
 #[derive(Debug)]
 enum Value {
     SingleValue(P<ast::Expr>),
@@ -14,7 +16,7 @@ enum Value {
     RepeatedValue(Vec<Value>),
 }
 #[derive(Debug)]
-struct Field(ast::Ident, Value);
+struct Field(Vec<ast::Ident>, Value);
 #[derive(Debug)]
 struct Message(Vec<Field>);
 
@@ -57,8 +59,20 @@ fn parse_value(parser: &mut Parser) -> PResult<Value> {
     }
 }
 
+fn parse_idents(parser: &mut Parser) -> PResult<Vec<ast::Ident>> {
+    let mut vec = Vec::new();
+
+    vec.push(try!(parser.parse_ident()));
+
+    while try!(parser.eat(&token::Dot)) {
+        vec.push(try!(parser.parse_ident()));
+    }
+
+    Ok(vec)
+}
+
 fn parse_field(parser: &mut Parser) -> PResult<Field> {
-    let ident = try!(parser.parse_ident());
+    let ident = try!(parse_idents(parser));
 
     match parser.token {
         token::Colon => {
@@ -139,40 +153,23 @@ fn emit_repeated(cx: &mut ExtCtxt, sp: Span, value: Value, parent: P<ast::Expr>)
 }
 
 fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field, parent: P<ast::Expr>) -> P<ast::Expr> {
-    let Field(field, value) = field;
+    let Field(key, value) = field;
 
     match value {
         Value::SingleValue(expr) => {
-            let f_set_xxx = cx.ident_of(&format!("set_{}", field));
-            cx.expr_method_call(
-                sp,
-                parent,
-                f_set_xxx,
-                vec![expr]
-            )
+            util::field_set(cx, sp, parent, &key, expr)
         },
         Value::MessageValue(msg) => {
-            let f_mut_xxx = cx.ident_of(&format!("mut_{}", field));
-            let e_mut_xxx = cx.expr_method_call(
-                sp,
-                parent,
-                f_mut_xxx,
-                Vec::new()
-            );
-            emit_message(cx, sp, msg, e_mut_xxx)
+            let e_msg = util::field_get(cx, sp, parent, &key, true);
+            emit_message(cx, sp, msg, e_msg)
         },
         Value::RepeatedValue(values) => {
             let mut stmts = Vec::new();
 
             let i_repeated = cx.ident_of("repeated");
             let e_repeated = cx.expr_ident(sp, i_repeated);
-            let f_mut_xxx = cx.ident_of(&format!("mut_{}", field));
-            let e_mut_xxx = cx.expr_method_call(
-                sp,
-                parent,
-                f_mut_xxx,
-                Vec::new()
-            );
+
+            let e_mut_xxx = util::field_get(cx, sp, parent, &key, true);
             stmts.push(cx.stmt_let(sp, true, i_repeated, e_mut_xxx));
 
             for v in values {

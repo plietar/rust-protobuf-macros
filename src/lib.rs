@@ -1,4 +1,6 @@
 #![feature(plugin_registrar, rustc_private)]
+#![feature(collections)]
+
 #![crate_type="dylib"]
 #![crate_name="protobuf_macros"]
 
@@ -6,6 +8,8 @@ extern crate rustc;
 extern crate syntax;
 
 use rustc::plugin::Registry;
+
+mod util;
 
 mod protobuf_init;
 use protobuf_init::macro_protobuf_init;
