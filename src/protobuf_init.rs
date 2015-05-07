@@ -117,39 +117,29 @@ fn parse_protobuf(cx: &mut ExtCtxt, tts: &[ast::TokenTree]) -> PResult<(P<ast::E
 }
 
 fn emit_repeated(cx: &mut ExtCtxt, sp: Span, value: Value, parent: P<ast::Expr>) -> P<ast::Stmt> {
-    let e_v = match value {
-        Value::SingleValue(expr) => expr,
-        Value::MessageValue(msg) => {
-            let f_create = cx.ident_of("create");
-            let e_msg = cx.expr_method_call(
+    let e = match value {
+        Value::SingleValue(expr) => {
+            let f_push = cx.ident_of("push");
+            cx.expr_method_call(
                 sp,
-                parent.clone(),
-                f_create,
-                Vec::new()
-            );
-            emit_message(cx, sp, msg, e_msg)
+                parent,
+                f_push,
+                vec![expr])
+        },
+        Value::MessageValue(msg) => {
+            let f_push_default = cx.ident_of("push_default");
+            let e_push_default = cx.expr_method_call(
+                sp,
+                parent,
+                f_push_default,
+                Vec::new());
+
+            emit_message(cx, sp, msg, e_push_default)
         },
         Value::RepeatedValue(_) => panic!("Cannot nest repeated fields")
     };
 
-    let i_value = cx.ident_of("value");
-    let e_value = cx.expr_ident(sp, i_value);
-
-    let f_push = cx.ident_of("push");
-    let e_push = cx.expr_method_call(
-        sp,
-        parent,
-        f_push,
-        vec![e_value]);
-
-    let stmts = vec![
-        cx.stmt_let(sp, false, i_value, e_v),
-        cx.stmt_expr(e_push)];
-
-    let block = cx.block(sp, stmts, None);
-    let e_block = cx.expr_block(block);
-
-    cx.stmt_expr(e_block)
+    cx.stmt_expr(e)
 }
 
 fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field, parent: P<ast::Expr>) -> P<ast::Expr> {
