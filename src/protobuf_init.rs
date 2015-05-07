@@ -3,120 +3,27 @@ use syntax::ast;
 use syntax::codemap::Span;
 use syntax::ext::base::{ExtCtxt, MacResult, MacEager, DummyResult};
 use syntax::ext::build::AstBuilder;
-use syntax::parse::{token,PResult};
+use syntax::parse::PResult;
 use syntax::parse::parser::Parser;
 use syntax::ptr::P;
 
 use util;
+use util::{Value, Field, Message, RHSParser};
 
-#[derive(Debug)]
-enum Value {
-    SingleValue(P<ast::Expr>),
-    MessageValue(Message),
-    RepeatedValue(Vec<Value>),
-}
-#[derive(Debug)]
-struct Field(Vec<ast::Ident>, Value);
-#[derive(Debug)]
-struct Message(Vec<Field>);
-
-fn parse_repeated(parser: &mut Parser) -> PResult<Vec<Value>> {
-    try!(parser.expect(&token::OpenDelim(token::Bracket)));
-    let mut values = Vec::new();
-
-    while parser.token != token::CloseDelim(token::Bracket) {
-        values.push(try!(parse_value(parser)));
-
-        try!(parser.expect_one_of(
-            &[token::Comma],
-            &[token::CloseDelim(token::Bracket)]));
-    }
-
-    try!(parser.expect(&token::CloseDelim(token::Bracket)));
-
-    Ok(values)
-}
-
-fn parse_compound(parser: &mut Parser) -> PResult<Value> {
-    match parser.token {
-        token::OpenDelim(token::Brace) => {
-            Ok(Value::MessageValue(try!(parse_message(parser))))
-        },
-        token::OpenDelim(token::Bracket) => {
-            Ok(Value::RepeatedValue(try!(parse_repeated(parser))))
-        },
-        _ => Err(parser.unexpected())
+struct ExprParser;
+impl RHSParser for ExprParser {
+    type RHS = P<ast::Expr>;
+    fn parse(&mut self, parser: &mut Parser) -> PResult<Self::RHS> {
+        parser.parse_expr_nopanic()
     }
 }
 
-fn parse_value(parser: &mut Parser) -> PResult<Value> {
-    match parser.token {
-        token::At => {
-            try!(parser.bump());
-            Ok(try!(parse_compound(parser)))
-        }
-        _ => Ok(Value::SingleValue(try!(parser.parse_expr_nopanic()))),
-    }
-}
-
-fn parse_idents(parser: &mut Parser) -> PResult<Vec<ast::Ident>> {
-    let mut vec = Vec::new();
-
-    vec.push(try!(parser.parse_ident()));
-
-    while try!(parser.eat(&token::Dot)) {
-        vec.push(try!(parser.parse_ident()));
-    }
-
-    Ok(vec)
-}
-
-fn parse_field(parser: &mut Parser) -> PResult<Field> {
-    let ident = try!(parse_idents(parser));
-
-    match parser.token {
-        token::Colon => {
-            try!(parser.bump());
-            Ok(Field(ident, try!(parse_value(parser))))
-        },
-        token::FatArrow => {
-            try!(parser.bump());
-            Ok(Field(ident, try!(parse_compound(parser))))
-        },
-        _ => Err(parser.unexpected())
-    }
-}
-
-fn parse_message(parser: &mut Parser) -> PResult<Message> {
-    try!(parser.expect(&token::OpenDelim(token::Brace)));
-
-    let mut fields = Vec::new();
-
-    while parser.token != token::CloseDelim(token::Brace) {
-        let f = try!(parse_field(parser));
-        fields.push(f);
-
-        try!(parser.expect_one_of(
-            &[token::Comma],
-            &[token::CloseDelim(token::Brace)]));
-    }
-
-    try!(parser.expect(&token::CloseDelim(token::Brace)));
-    Ok(Message(fields))
-}
-
-fn parse_protobuf(cx: &mut ExtCtxt, tts: &[ast::TokenTree]) -> PResult<(P<ast::Expr>, Message)> {
+fn parse_protobuf(cx: &mut ExtCtxt, tts: &[ast::TokenTree]) -> PResult<(P<ast::Expr>, Message<P<ast::Expr>>)> {
     let mut parser = cx.new_parser_from_tts(&tts.to_vec());
-
-    let expr = try!(parser.parse_expr_nopanic());
-    try!(parser.expect(&token::Comma));
-    let msg = try!(parse_message(&mut parser));
-    try!(parser.expect(&token::Eof));
-
-    return Ok((expr, msg))
+    util::MacroParser::new(&mut parser, ExprParser).parse_macro()
 }
 
-fn emit_repeated(cx: &mut ExtCtxt, sp: Span, value: Value, parent: P<ast::Expr>) -> P<ast::Stmt> {
+fn emit_repeated(cx: &mut ExtCtxt, sp: Span, value: Value<P<ast::Expr>>, parent: P<ast::Expr>) -> P<ast::Stmt> {
     let e = match value {
         Value::SingleValue(expr) => {
             let f_push = cx.ident_of("push");
@@ -142,7 +49,7 @@ fn emit_repeated(cx: &mut ExtCtxt, sp: Span, value: Value, parent: P<ast::Expr>)
     cx.stmt_expr(e)
 }
 
-fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field, parent: P<ast::Expr>) -> P<ast::Expr> {
+fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field<P<ast::Expr>>, parent: P<ast::Expr>) -> P<ast::Expr> {
     let Field(key, value) = field;
 
     match value {
@@ -171,7 +78,7 @@ fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field, parent: P<ast::Expr>) ->
     }
 }
 
-fn emit_message(cx: &mut ExtCtxt, sp: Span, msg: Message, expr: P<ast::Expr>) -> P<ast::Expr>{
+fn emit_message(cx: &mut ExtCtxt, sp: Span, msg: Message<P<ast::Expr>>, expr: P<ast::Expr>) -> P<ast::Expr>{
     let Message(fields) = msg;
     let i_msg = cx.ident_of("msg");
     let e_msg = cx.expr_ident(sp, i_msg);
