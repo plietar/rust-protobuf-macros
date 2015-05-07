@@ -54,10 +54,10 @@ fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field<P<ast::Expr>>, parent: P<
 
     match value {
         Value::SingleValue(expr) => {
-            util::field_set(cx, sp, parent, &key, expr)
+            util::field_set(cx, parent, &key, expr)
         },
         Value::MessageValue(msg) => {
-            let e_msg = util::field_get(cx, sp, parent, &key, true);
+            let e_msg = util::field_get(cx, parent, &key, true);
             emit_message(cx, sp, msg, e_msg)
         },
         Value::RepeatedValue(values) => {
@@ -66,7 +66,7 @@ fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field<P<ast::Expr>>, parent: P<
             let i_repeated = cx.ident_of("repeated");
             let e_repeated = cx.expr_ident(sp, i_repeated);
 
-            let e_mut_xxx = util::field_get(cx, sp, parent, &key, true);
+            let e_mut_xxx = util::field_get(cx, parent, &key, true);
             stmts.push(cx.stmt_let(sp, true, i_repeated, e_mut_xxx));
 
             for v in values {

@@ -1,5 +1,5 @@
 use syntax::ast;
-use syntax::codemap::Span;
+use syntax::codemap::{Spanned, Span, respan, spanned};
 use syntax::ptr::P;
 use syntax::parse::parser::Parser;
 use syntax::ext::base::ExtCtxt;
@@ -12,17 +12,51 @@ enum Accessor {
     Set
 }
 
-fn field_accessor(cx: &ExtCtxt, ident: &ast::Ident, mode: Accessor) -> ast::Ident {
+pub trait ParserExt {
+    fn parse_spanned_ident(&mut self) -> PResult<Spanned<ast::Ident>>;
+}
+
+impl <'a> ParserExt for Parser<'a> {
+    fn parse_spanned_ident(&mut self) -> PResult<Spanned<ast::Ident>> {
+        let lo = self.span.lo;
+        let ident = try!(self.parse_ident());
+        let hi = self.span.hi;
+        
+        Ok(spanned(lo, hi, ident))
+    }
+}
+
+pub trait AstBuilderExt {
+    fn stmt_let_pat(&self, sp: Span, pat: P<ast::Pat>, ex: P<ast::Expr>) -> P<ast::Stmt>;
+}
+
+impl <T : AstBuilder> AstBuilderExt for T {
+    fn stmt_let_pat(&self, sp: Span, pat: P<ast::Pat>, ex: P<ast::Expr>) -> P<ast::Stmt> {
+        let local = P(ast::Local {
+            pat: pat,
+            ty: None,
+            init: Some(ex),
+            id: ast::DUMMY_NODE_ID,
+            span: sp,
+            source: ast::LocalLet,
+        });
+
+        let decl = respan(sp, ast::DeclLocal(local));
+        P(respan(sp, ast::StmtDecl(P(decl), ast::DUMMY_NODE_ID)))
+    }
+}
+
+fn field_accessor(cx: &ExtCtxt, ident: &Spanned<ast::Ident>, mode: Accessor) -> Spanned<ast::Ident> {
     let prefix = match mode {
         Accessor::Get => "get_",
         Accessor::Mut => "mut_",
         Accessor::Set => "set_"
     };
 
-    cx.ident_of(&(prefix.to_string() + ident.as_str()))
+    respan(ident.span, cx.ident_of(&(prefix.to_string() + ident.node.as_str())))
 }
 
-pub fn field_get(cx: &ExtCtxt, sp: Span, parent: P<ast::Expr>, key: &[ast::Ident], mutable: bool) -> P<ast::Expr> {
+pub fn field_get(cx: &ExtCtxt, parent: P<ast::Expr>, key: &[Spanned<ast::Ident>], mutable: bool) -> P<ast::Expr> {
     assert!(key.len() > 0);
 
     let mut e = parent;
@@ -34,29 +68,29 @@ pub fn field_get(cx: &ExtCtxt, sp: Span, parent: P<ast::Expr>, key: &[ast::Ident
         };
 
         e = cx.expr_method_call(
-            sp,
+            accessor.span,
             e,
-            accessor,
+            accessor.node,
             Vec::new())
     }
 
     return e;
 }
 
-pub fn field_set(cx: &ExtCtxt, sp: Span, parent: P<ast::Expr>, key: &[ast::Ident], value: P<ast::Expr>) -> P<ast::Expr> {
+pub fn field_set(cx: &ExtCtxt, parent: P<ast::Expr>, key: &[Spanned<ast::Ident>], value: P<ast::Expr>) -> P<ast::Expr> {
     assert!(key.len() > 0);
 
     let parent = if key.len() > 1 {
-        field_get(cx, sp, parent, key.init(), true)
+        field_get(cx, parent, key.init(), true)
     } else {
         parent
     };
 
-    let f = field_accessor(cx, key.last().unwrap(), Accessor::Set);
+    let accessor = field_accessor(cx, key.last().unwrap(), Accessor::Set);
     cx.expr_method_call(
-        sp,
+        accessor.span,
         parent,
-        f,
+        accessor.node,
         vec![value])
 }
 
@@ -77,7 +111,7 @@ pub enum Value<T> {
     RepeatedValue(Vec<Value<T>>),
 }
 #[derive(Debug)]
-pub struct Field<T>(pub Vec<ast::Ident>, pub Value<T>);
+pub struct Field<T>(pub Vec<Spanned<ast::Ident>>, pub Value<T>);
 
 #[derive(Debug)]
 pub struct Message<T>(pub Vec<Field<T>>);
@@ -118,7 +152,7 @@ impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
     }
 
     fn parse_field(&mut self) -> PResult<Field<T::RHS>> {
-        let ident = try!(self.parse_idents());
+        let ident = try!(self.parse_spanned_idents());
 
         match self.parser.token {
             token::Colon => {
@@ -133,13 +167,13 @@ impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
         }
     }
 
-    fn parse_idents(&mut self) -> PResult<Vec<ast::Ident>> {
+    fn parse_spanned_idents(&mut self) -> PResult<Vec<Spanned<ast::Ident>>> {
         let mut vec = Vec::new();
 
-        vec.push(try!(self.parser.parse_ident()));
+        vec.push(try!(self.parser.parse_spanned_ident()));
 
         while try!(self.parser.eat(&token::Dot)) {
-            vec.push(try!(self.parser.parse_ident()));
+            vec.push(try!(self.parser.parse_spanned_ident()));
         }
 
         Ok(vec)
