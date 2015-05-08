@@ -80,19 +80,23 @@ fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field<P<ast::Expr>>, parent: P<
 
 fn emit_message(cx: &mut ExtCtxt, sp: Span, msg: Message<P<ast::Expr>>, expr: P<ast::Expr>) -> P<ast::Expr>{
     let Message(fields) = msg;
-    let i_msg = cx.ident_of("msg");
-    let e_msg = cx.expr_ident(sp, i_msg);
+    if fields.len() > 0 {
+        let i_msg = cx.ident_of("msg");
+        let e_msg = cx.expr_ident(sp, i_msg);
 
-    let mut stmts = Vec::new();
-    stmts.push(cx.stmt_let(sp, true, i_msg, expr));
+        let mut stmts = Vec::new();
+        stmts.push(cx.stmt_let(sp, true, i_msg, expr));
 
-    for f in fields {
-        let e_field = emit_field(cx, sp, f, e_msg.clone());
-        stmts.push(cx.stmt_expr(e_field));
+        for f in fields {
+            let e_field = emit_field(cx, sp, f, e_msg.clone());
+            stmts.push(cx.stmt_expr(e_field));
+        }
+
+        let block = cx.block(sp, stmts, Some(e_msg));
+        cx.expr_block(block)
+    } else {
+        expr
     }
-
-    let block = cx.block(sp, stmts, Some(e_msg));
-    cx.expr_block(block)
 }
 
 pub fn macro_protobuf_init(cx: &mut ExtCtxt, sp: Span, tts: &[ast::TokenTree]) -> Box<MacResult+'static> {
