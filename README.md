@@ -23,7 +23,7 @@ Then enable it in your crate :
 
 ## Usage
 The examples use the following schema :
-```
+```protobuf
 message Person {
   required string name = 1;
   required int32 id = 2;
