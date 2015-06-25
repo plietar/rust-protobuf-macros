@@ -1,5 +1,5 @@
 #![feature(plugin_registrar, rustc_private)]
-#![feature(collections)]
+#![feature(slice_extras)]
 
 #![crate_type="dylib"]
 #![crate_name="protobuf_macros"]
