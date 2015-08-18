@@ -38,7 +38,6 @@ impl <T : AstBuilder> AstBuilderExt for T {
             init: Some(ex),
             id: ast::DUMMY_NODE_ID,
             span: sp,
-            source: ast::LocalLet,
         });
 
         let decl = respan(sp, ast::DeclLocal(local));
@@ -53,7 +52,7 @@ fn field_accessor(cx: &ExtCtxt, ident: &Spanned<ast::Ident>, mode: Accessor) -> 
         Accessor::Set => "set_"
     };
 
-    respan(ident.span, cx.ident_of(&(prefix.to_string() + ident.node.as_str())))
+    respan(ident.span, cx.ident_of(&(prefix.to_string() + &ident.node.to_string())))
 }
 
 pub fn field_get(cx: &ExtCtxt, parent: P<ast::Expr>, key: &[Spanned<ast::Ident>], mutable: bool) -> P<ast::Expr> {
@@ -81,7 +80,10 @@ pub fn field_set(cx: &ExtCtxt, parent: P<ast::Expr>, key: &[Spanned<ast::Ident>]
     assert!(key.len() > 0);
 
     let parent = if key.len() > 1 {
-        field_get(cx, parent, key.init(), true)
+        match key.split_last() {
+            None => panic!("Contradiction to assertion"),
+            Some(split_array) => field_get(cx, parent, split_array.1, true),
+        }
     } else {
         parent
     };
