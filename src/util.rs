@@ -77,18 +77,13 @@ pub fn field_get(cx: &ExtCtxt, parent: P<ast::Expr>, key: &[Spanned<ast::Ident>]
 }
 
 pub fn field_set(cx: &ExtCtxt, parent: P<ast::Expr>, key: &[Spanned<ast::Ident>], value: P<ast::Expr>) -> P<ast::Expr> {
-    assert!(key.len() > 0);
-
-    let parent = if key.len() > 1 {
-        match key.split_last() {
-            None => panic!("Contradiction to assertion"),
-            Some(split_array) => field_get(cx, parent, split_array.1, true),
-        }
-    } else {
-        parent
+    let (ident, parent) = match key.split_last() {
+        None => panic!("At least one ident is required"),
+        Some((ident, [])) => (ident, parent),
+        Some((ident, path)) => (ident, field_get(cx, parent, path, true))
     };
+    let accessor = field_accessor(cx, ident, Accessor::Set);
 
-    let accessor = field_accessor(cx, key.last().unwrap(), Accessor::Set);
     cx.expr_method_call(
         accessor.span,
         parent,

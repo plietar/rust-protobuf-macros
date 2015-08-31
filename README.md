@@ -11,8 +11,9 @@ rust beta will NOT work !
 Add to your `Cargo.toml`
 ```toml
 [dependencies.protobuf]
-
 git = "https://github.com/stepancheg/rust-protobuf.git"
+[dependencies.protobuf_macros]
+git = "https://github.com/plietarrust-protobuf-macros.git"
 ```
 
 Then enable it in your crate :
@@ -113,13 +114,4 @@ for phone in phone_numbers {
     });
 }
 ```
-
-
-
-
-
-
-
-
-
 
