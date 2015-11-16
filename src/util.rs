@@ -122,7 +122,7 @@ impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
     }
 
     pub fn parse_macro(&mut self) -> PResult<(P<ast::Expr>, Message<T::RHS>)> {
-        let expr = try!(self.parser.parse_expr_nopanic());
+        let expr = try!(self.parser.parse_expr());
         try!(self.parser.expect(&token::Comma));
         let msg = try!(self.parse_message());
         try!(self.parser.expect(&token::Eof));
