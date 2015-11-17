@@ -14,7 +14,7 @@ struct ExprParser;
 impl RHSParser for ExprParser {
     type RHS = P<ast::Expr>;
     fn parse(&mut self, parser: &mut Parser) -> PResult<Self::RHS> {
-        parser.parse_expr_nopanic()
+        parser.parse_expr()
     }
 }
 
