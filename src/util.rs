@@ -38,6 +38,7 @@ impl <T : AstBuilder> AstBuilderExt for T {
             init: Some(ex),
             id: ast::DUMMY_NODE_ID,
             span: sp,
+            attrs: None,
         });
 
         let decl = respan(sp, ast::DeclLocal(local));
