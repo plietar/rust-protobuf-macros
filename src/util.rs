@@ -12,12 +12,12 @@ enum Accessor {
     Set
 }
 
-pub trait ParserExt {
-    fn parse_spanned_ident(&mut self) -> PResult<Spanned<ast::Ident>>;
+pub trait ParserExt<'a> {
+    fn parse_spanned_ident(&mut self) -> PResult<'a, Spanned<ast::Ident>>;
 }
 
-impl <'a> ParserExt for Parser<'a> {
-    fn parse_spanned_ident(&mut self) -> PResult<Spanned<ast::Ident>> {
+impl <'a> ParserExt<'a> for Parser<'a> {
+    fn parse_spanned_ident(&mut self) -> PResult<'a, Spanned<ast::Ident>> {
         let lo = self.span.lo;
         let ident = try!(self.parse_ident());
         let hi = self.span.hi;
@@ -94,7 +94,7 @@ pub fn field_set(cx: &ExtCtxt, parent: P<ast::Expr>, key: &[Spanned<ast::Ident>]
 
 pub trait RHSParser {
     type RHS;
-    fn parse(&mut self, parser: &mut Parser) -> PResult<Self::RHS>;
+    fn parse<'a>(&mut self, parser: &mut Parser<'a>) -> PResult<'a, Self::RHS>;
 }
 
 pub struct MacroParser<'a, 'b: 'a, T : RHSParser> {
@@ -122,7 +122,7 @@ impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
         }
     }
 
-    pub fn parse_macro(&mut self) -> PResult<(P<ast::Expr>, Message<T::RHS>)> {
+    pub fn parse_macro(&mut self) -> PResult<'b, (P<ast::Expr>, Message<T::RHS>)> {
         let expr = try!(self.parser.parse_expr());
         try!(self.parser.expect(&token::Comma));
         let msg = try!(self.parse_message());
@@ -131,7 +131,7 @@ impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
         return Ok((expr, msg))
     }
 
-    fn parse_message(&mut self) -> PResult<Message<T::RHS>> {
+    fn parse_message(&mut self) -> PResult<'b, Message<T::RHS>> {
         try!(self.parser.expect(&token::OpenDelim(token::Brace)));
 
         let mut fields = Vec::new();
@@ -149,7 +149,7 @@ impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
         Ok(Message(fields))
     }
 
-    fn parse_field(&mut self) -> PResult<Field<T::RHS>> {
+    fn parse_field(&mut self) -> PResult<'b, Field<T::RHS>> {
         let ident = try!(self.parse_spanned_idents());
 
         match self.parser.token {
@@ -165,7 +165,7 @@ impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
         }
     }
 
-    fn parse_spanned_idents(&mut self) -> PResult<Vec<Spanned<ast::Ident>>> {
+    fn parse_spanned_idents(&mut self) -> PResult<'b, Vec<Spanned<ast::Ident>>> {
         let mut vec = Vec::new();
 
         vec.push(try!(self.parser.parse_spanned_ident()));
@@ -178,7 +178,7 @@ impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
     }
 
 
-    fn parse_compound(&mut self) -> PResult<Value<T::RHS>> {
+    fn parse_compound(&mut self) -> PResult<'b, Value<T::RHS>> {
         match self.parser.token {
             token::OpenDelim(token::Brace) => {
                 Ok(Value::MessageValue(try!(self.parse_message())))
@@ -190,7 +190,7 @@ impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
         }
     }
 
-    fn parse_repeated(&mut self) -> PResult<Vec<Value<T::RHS>>> {
+    fn parse_repeated(&mut self) -> PResult<'b, Vec<Value<T::RHS>>> {
         try!(self.parser.expect(&token::OpenDelim(token::Bracket)));
         let mut values = Vec::new();
 
@@ -207,7 +207,7 @@ impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
         Ok(values)
     }
 
-    fn parse_value(&mut self) -> PResult<Value<T::RHS>> {
+    fn parse_value(&mut self) -> PResult<'b, Value<T::RHS>> {
         match self.parser.token {
             token::At => {
                 try!(self.parser.bump());

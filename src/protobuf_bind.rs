@@ -14,12 +14,12 @@ use util::{Value, Field, Message, RHSParser, ParserExt, AstBuilderExt};
 struct IdentParser;
 impl RHSParser for IdentParser {
     type RHS = Spanned<ast::Ident>;
-    fn parse(&mut self, parser: &mut Parser) -> PResult<Self::RHS> {
+    fn parse<'a>(&mut self, parser: &mut Parser<'a>) -> PResult<'a, Self::RHS> {
         parser.parse_spanned_ident()
     }
 }
 
-fn parse_protobuf(cx: &mut ExtCtxt, tts: &[ast::TokenTree]) -> PResult<(P<ast::Expr>, Message<Spanned<ast::Ident>>)> {
+fn parse_protobuf<'a>(cx: &mut ExtCtxt<'a>, tts: &[ast::TokenTree]) -> PResult<'a, (P<ast::Expr>, Message<Spanned<ast::Ident>>)> {
     let mut parser = cx.new_parser_from_tts(&tts.to_vec());
     util::MacroParser::new(&mut parser, IdentParser).parse_macro()
 }

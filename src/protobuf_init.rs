@@ -13,12 +13,12 @@ use util::{Value, Field, Message, RHSParser};
 struct ExprParser;
 impl RHSParser for ExprParser {
     type RHS = P<ast::Expr>;
-    fn parse(&mut self, parser: &mut Parser) -> PResult<Self::RHS> {
+    fn parse<'a>(&mut self, parser: &mut Parser<'a>) -> PResult<'a, Self::RHS> {
         parser.parse_expr()
     }
 }
 
-fn parse_protobuf(cx: &mut ExtCtxt, tts: &[ast::TokenTree]) -> PResult<(P<ast::Expr>, Message<P<ast::Expr>>)> {
+fn parse_protobuf<'a>(cx: &mut ExtCtxt<'a>, tts: &[ast::TokenTree]) -> PResult<'a, (P<ast::Expr>, Message<P<ast::Expr>>)> {
     let mut parser = cx.new_parser_from_tts(&tts.to_vec());
     util::MacroParser::new(&mut parser, ExprParser).parse_macro()
 }
