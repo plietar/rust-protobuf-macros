@@ -13,7 +13,7 @@ Add to your `Cargo.toml`
 [dependencies.protobuf]
 git = "https://github.com/stepancheg/rust-protobuf.git"
 [dependencies.protobuf_macros]
-git = "https://github.com/plietarrust-protobuf-macros.git"
+git = "https://github.com/plietar/rust-protobuf-macros.git"
 ```
 
 Then enable it in your crate :

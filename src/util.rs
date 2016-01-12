@@ -154,14 +154,14 @@ impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
 
         match self.parser.token {
             token::Colon => {
-                try!(self.parser.bump());
+                self.parser.bump();
                 Ok(Field(ident, try!(self.parse_value())))
             },
             token::FatArrow => {
-                try!(self.parser.bump());
+                self.parser.bump();
                 Ok(Field(ident, try!(self.parse_compound())))
             },
-            _ => Err(self.parser.unexpected())
+            _ => self.parser.unexpected()
         }
     }
 
@@ -170,7 +170,7 @@ impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
 
         vec.push(try!(self.parser.parse_spanned_ident()));
 
-        while try!(self.parser.eat(&token::Dot)) {
+        while self.parser.eat(&token::Dot) {
             vec.push(try!(self.parser.parse_spanned_ident()));
         }
 
@@ -186,7 +186,7 @@ impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
             token::OpenDelim(token::Bracket) => {
                 Ok(Value::RepeatedValue(try!(self.parse_repeated())))
             },
-            _ => Err(self.parser.unexpected())
+            _ => self.parser.unexpected()
         }
     }
 
@@ -210,7 +210,7 @@ impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
     fn parse_value(&mut self) -> PResult<'b, Value<T::RHS>> {
         match self.parser.token {
             token::At => {
-                try!(self.parser.bump());
+                self.parser.bump();
                 Ok(try!(self.parse_compound()))
             }
             _ => Ok(Value::SingleValue(try!(self.rhs_parser.parse(self.parser)))),
