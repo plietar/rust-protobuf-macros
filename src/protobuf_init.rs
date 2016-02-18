@@ -23,7 +23,7 @@ fn parse_protobuf<'a>(cx: &mut ExtCtxt<'a>, tts: &[ast::TokenTree]) -> PResult<'
     util::MacroParser::new(&mut parser, ExprParser).parse_macro()
 }
 
-fn emit_repeated(cx: &mut ExtCtxt, sp: Span, value: Value<P<ast::Expr>>, parent: P<ast::Expr>) -> P<ast::Stmt> {
+fn emit_repeated(cx: &mut ExtCtxt, sp: Span, value: Value<P<ast::Expr>>, parent: P<ast::Expr>) -> ast::Stmt {
     let e = match value {
         Value::SingleValue(expr) => {
             let f_push = cx.ident_of("push");

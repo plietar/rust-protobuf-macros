@@ -27,11 +27,11 @@ impl <'a> ParserExt<'a> for Parser<'a> {
 }
 
 pub trait AstBuilderExt {
-    fn stmt_let_pat(&self, sp: Span, pat: P<ast::Pat>, ex: P<ast::Expr>) -> P<ast::Stmt>;
+    fn stmt_let_pat(&self, sp: Span, pat: P<ast::Pat>, ex: P<ast::Expr>) -> ast::Stmt;
 }
 
 impl <T : AstBuilder> AstBuilderExt for T {
-    fn stmt_let_pat(&self, sp: Span, pat: P<ast::Pat>, ex: P<ast::Expr>) -> P<ast::Stmt> {
+    fn stmt_let_pat(&self, sp: Span, pat: P<ast::Pat>, ex: P<ast::Expr>) -> ast::Stmt {
         let local = P(ast::Local {
             pat: pat,
             ty: None,
@@ -41,8 +41,8 @@ impl <T : AstBuilder> AstBuilderExt for T {
             attrs: None,
         });
 
-        let decl = respan(sp, ast::DeclLocal(local));
-        P(respan(sp, ast::StmtDecl(P(decl), ast::DUMMY_NODE_ID)))
+        let decl = respan(sp, ast::DeclKind::Local(local));
+        respan(sp, ast::StmtKind::Decl(P(decl), ast::DUMMY_NODE_ID))
     }
 }
 
