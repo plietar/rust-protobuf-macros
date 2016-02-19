@@ -9,3 +9,5 @@ path = "src/lib.rs"
 plugin = true
 test = false
 
+[dependencies.aster]
+version = "^0.13.1"

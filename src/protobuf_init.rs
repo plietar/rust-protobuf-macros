@@ -1,3 +1,4 @@
+use aster::expr::ExprBuilder;
 use std::clone::Clone;
 use syntax::ast;
 use syntax::codemap::Span;
@@ -23,10 +24,35 @@ fn parse_protobuf<'a>(cx: &mut ExtCtxt<'a>, tts: &[ast::TokenTree]) -> PResult<'
     util::MacroParser::new(&mut parser, ExprParser).parse_macro()
 }
 
+fn convert_single_value(cx: &mut ExtCtxt, value: P<ast::Expr>) -> P<ast::Expr> {
+    let use_into = if let ast::ExprKind::Lit(ref lit) = value.node {
+        if let ast::LitKind::Str(..) = lit.node {
+            true
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    if use_into {
+        ExprBuilder::new()
+                    .span(value.span)
+                    .call().span(value.span).path().global().ids(&["std", "convert", "Into", "into"]).build()
+                    .arg().span(value.span).build(value)
+                    .build()
+    } else {
+        value
+    }
+}
+
+
 fn emit_repeated(cx: &mut ExtCtxt, sp: Span, value: Value<P<ast::Expr>>, parent: P<ast::Expr>) -> ast::Stmt {
     let e = match value {
         Value::SingleValue(expr) => {
             let f_push = cx.ident_of("push");
+            let expr = convert_single_value(cx, expr);
+
             cx.expr_method_call(
                 sp,
                 parent,
@@ -54,6 +80,7 @@ fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field<P<ast::Expr>>, parent: P<
 
     match value {
         Value::SingleValue(expr) => {
+            let expr = convert_single_value(cx, expr);
             util::field_set(cx, parent, &key, expr)
         },
         Value::MessageValue(msg) => {

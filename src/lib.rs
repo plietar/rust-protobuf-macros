@@ -6,6 +6,7 @@
 
 extern crate rustc;
 extern crate syntax;
+extern crate aster;
 
 extern crate rustc_plugin;
 use rustc_plugin::Registry;
