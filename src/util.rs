@@ -1,29 +1,16 @@
+use aster::stmt::StmtBuilder;
+use aster::expr::ExprBuilder;
+use aster::ident::ToIdent;
+
 use syntax::ast;
-use syntax::codemap::{Spanned, Span, respan, spanned};
+use syntax::codemap::{Spanned, Span, respan};
 use syntax::ptr::P;
-use syntax::parse::parser::Parser;
-use syntax::ext::base::ExtCtxt;
 use syntax::ext::build::AstBuilder;
-use syntax::parse::{token,PResult};
 
 enum Accessor {
     Get,
     Mut,
     Set
-}
-
-pub trait ParserExt<'a> {
-    fn parse_spanned_ident(&mut self) -> PResult<'a, Spanned<ast::Ident>>;
-}
-
-impl <'a> ParserExt<'a> for Parser<'a> {
-    fn parse_spanned_ident(&mut self) -> PResult<'a, Spanned<ast::Ident>> {
-        let lo = self.span.lo;
-        let ident = try!(self.parse_ident());
-        let hi = self.span.hi;
-        
-        Ok(spanned(lo, hi, ident))
-    }
 }
 
 pub trait AstBuilderExt {
@@ -46,177 +33,52 @@ impl <T : AstBuilder> AstBuilderExt for T {
     }
 }
 
-fn field_accessor(cx: &ExtCtxt, ident: &Spanned<ast::Ident>, mode: Accessor) -> Spanned<ast::Ident> {
+fn field_accessor(ident: &Spanned<ast::Ident>, mode: Accessor) -> Spanned<ast::Ident> {
     let prefix = match mode {
         Accessor::Get => "get_",
         Accessor::Mut => "mut_",
         Accessor::Set => "set_"
     };
 
-    respan(ident.span, cx.ident_of(&(prefix.to_string() + &ident.node.to_string())))
+    respan(ident.span, ToIdent::to_ident(&(prefix.to_string() + &ident.node.to_string())))
 }
 
-pub fn field_get(cx: &ExtCtxt, parent: P<ast::Expr>, key: &[Spanned<ast::Ident>], mutable: bool) -> P<ast::Expr> {
+pub fn field_get(parent: P<ast::Expr>,
+                 key: &[Spanned<ast::Ident>],
+                 mutable: bool) -> P<ast::Expr> {
+
     assert!(key.len() > 0);
 
     let mut e = parent;
     for ident in key {
         let accessor = if mutable {
-            field_accessor(cx, ident, Accessor::Mut)
+            field_accessor(ident, Accessor::Mut)
         } else {
-            field_accessor(cx, ident, Accessor::Get)
+            field_accessor(ident, Accessor::Get)
         };
 
-        e = cx.expr_method_call(
-            accessor.span,
-            e,
-            accessor.node,
-            Vec::new())
+        e = ExprBuilder::new()
+                        .method_call(accessor.node).build(e)
+                        .build();
     }
 
     return e;
 }
 
-pub fn field_set(cx: &ExtCtxt, parent: P<ast::Expr>, key: &[Spanned<ast::Ident>], value: P<ast::Expr>) -> P<ast::Expr> {
+pub fn field_set(parent: P<ast::Expr>,
+                 key: &[Spanned<ast::Ident>],
+                 value: P<ast::Expr>) -> ast::Stmt {
+
     let (ident, parent) = match key.split_last() {
         None => panic!("At least one ident is required"),
         Some((ident, [])) => (ident, parent),
-        Some((ident, path)) => (ident, field_get(cx, parent, path, true))
+        Some((ident, path)) => (ident, field_get(parent, path, true))
     };
-    let accessor = field_accessor(cx, ident, Accessor::Set);
 
-    cx.expr_method_call(
-        accessor.span,
-        parent,
-        accessor.node,
-        vec![value])
+    let accessor = field_accessor(ident, Accessor::Set);
+
+    StmtBuilder::new().expr()
+                .method_call(accessor.node).build(parent)
+                .arg().build(value)
+                .build()
 }
-
-pub trait RHSParser {
-    type RHS;
-    fn parse<'a>(&mut self, parser: &mut Parser<'a>) -> PResult<'a, Self::RHS>;
-}
-
-pub struct MacroParser<'a, 'b: 'a, T : RHSParser> {
-    parser: &'a mut Parser<'b>,
-    rhs_parser: T
-}
-
-#[derive(Debug)]
-pub enum Value<T> {
-    SingleValue(T),
-    MessageValue(Message<T>),
-    RepeatedValue(Vec<Value<T>>),
-}
-#[derive(Debug)]
-pub struct Field<T>(pub Vec<Spanned<ast::Ident>>, pub Value<T>);
-
-#[derive(Debug)]
-pub struct Message<T>(pub Vec<Field<T>>);
-
-impl <'a,'b, T : RHSParser> MacroParser<'a,'b, T> {
-    pub fn new(parser: &'a mut Parser<'b>, rhs_parser: T) -> MacroParser<'a, 'b, T> {
-        MacroParser {
-            parser: parser,
-            rhs_parser: rhs_parser
-        }
-    }
-
-    pub fn parse_macro(&mut self) -> PResult<'b, (P<ast::Expr>, Message<T::RHS>)> {
-        let expr = try!(self.parser.parse_expr());
-        try!(self.parser.expect(&token::Comma));
-        let msg = try!(self.parse_message());
-        try!(self.parser.expect(&token::Eof));
-
-        return Ok((expr, msg))
-    }
-
-    fn parse_message(&mut self) -> PResult<'b, Message<T::RHS>> {
-        try!(self.parser.expect(&token::OpenDelim(token::Brace)));
-
-        let mut fields = Vec::new();
-
-        while self.parser.token != token::CloseDelim(token::Brace) {
-            let f = try!(self.parse_field());
-            fields.push(f);
-
-            try!(self.parser.expect_one_of(
-                &[token::Comma],
-                &[token::CloseDelim(token::Brace)]));
-        }
-
-        try!(self.parser.expect(&token::CloseDelim(token::Brace)));
-        Ok(Message(fields))
-    }
-
-    fn parse_field(&mut self) -> PResult<'b, Field<T::RHS>> {
-        let ident = try!(self.parse_spanned_idents());
-
-        match self.parser.token {
-            token::Colon => {
-                self.parser.bump();
-                Ok(Field(ident, try!(self.parse_value())))
-            },
-            token::FatArrow => {
-                self.parser.bump();
-                Ok(Field(ident, try!(self.parse_compound())))
-            },
-            _ => self.parser.unexpected()
-        }
-    }
-
-    fn parse_spanned_idents(&mut self) -> PResult<'b, Vec<Spanned<ast::Ident>>> {
-        let mut vec = Vec::new();
-
-        vec.push(try!(self.parser.parse_spanned_ident()));
-
-        while self.parser.eat(&token::Dot) {
-            vec.push(try!(self.parser.parse_spanned_ident()));
-        }
-
-        Ok(vec)
-    }
-
-
-    fn parse_compound(&mut self) -> PResult<'b, Value<T::RHS>> {
-        match self.parser.token {
-            token::OpenDelim(token::Brace) => {
-                Ok(Value::MessageValue(try!(self.parse_message())))
-            },
-            token::OpenDelim(token::Bracket) => {
-                Ok(Value::RepeatedValue(try!(self.parse_repeated())))
-            },
-            _ => self.parser.unexpected()
-        }
-    }
-
-    fn parse_repeated(&mut self) -> PResult<'b, Vec<Value<T::RHS>>> {
-        try!(self.parser.expect(&token::OpenDelim(token::Bracket)));
-        let mut values = Vec::new();
-
-        while self.parser.token != token::CloseDelim(token::Bracket) {
-            values.push(try!(self.parse_value()));
-
-            try!(self.parser.expect_one_of(
-                &[token::Comma],
-                &[token::CloseDelim(token::Bracket)]));
-        }
-
-        try!(self.parser.expect(&token::CloseDelim(token::Bracket)));
-
-        Ok(values)
-    }
-
-    fn parse_value(&mut self) -> PResult<'b, Value<T::RHS>> {
-        match self.parser.token {
-            token::At => {
-                self.parser.bump();
-                Ok(try!(self.parse_compound()))
-            }
-            _ => Ok(Value::SingleValue(try!(self.rhs_parser.parse(self.parser)))),
-        }
-    }
-
-}
-
-

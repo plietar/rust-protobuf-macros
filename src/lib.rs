@@ -12,6 +12,7 @@ extern crate rustc_plugin;
 use rustc_plugin::Registry;
 
 mod util;
+mod parser;
 
 mod protobuf_init;
 use protobuf_init::macro_protobuf_init;

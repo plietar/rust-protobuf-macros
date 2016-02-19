@@ -1,5 +1,6 @@
 use aster::expr::ExprBuilder;
-use std::clone::Clone;
+use aster::stmt::StmtBuilder;
+
 use syntax::ast;
 use syntax::codemap::Span;
 use syntax::ext::base::{ExtCtxt, MacResult, MacEager, DummyResult};
@@ -9,7 +10,7 @@ use syntax::parse::parser::Parser;
 use syntax::ptr::P;
 
 use util;
-use util::{Value, Field, Message, RHSParser};
+use parser::{Value, Field, Message, MacroParser, RHSParser};
 
 struct ExprParser;
 impl RHSParser for ExprParser {
@@ -19,12 +20,14 @@ impl RHSParser for ExprParser {
     }
 }
 
-fn parse_protobuf<'a>(cx: &mut ExtCtxt<'a>, tts: &[ast::TokenTree]) -> PResult<'a, (P<ast::Expr>, Message<P<ast::Expr>>)> {
+fn parse_protobuf<'a>(cx: &mut ExtCtxt<'a>,
+                      tts: &[ast::TokenTree]) -> PResult<'a, (P<ast::Expr>, Message<P<ast::Expr>>)> {
+
     let mut parser = cx.new_parser_from_tts(&tts.to_vec());
-    util::MacroParser::new(&mut parser, ExprParser).parse_macro()
+    MacroParser::new(&mut parser, ExprParser).parse_macro()
 }
 
-fn convert_single_value(cx: &mut ExtCtxt, value: P<ast::Expr>) -> P<ast::Expr> {
+fn convert_single_value(value: P<ast::Expr>) -> P<ast::Expr> {
     let use_into = if let ast::ExprKind::Lit(ref lit) = value.node {
         if let ast::LitKind::Str(..) = lit.node {
             true
@@ -47,90 +50,92 @@ fn convert_single_value(cx: &mut ExtCtxt, value: P<ast::Expr>) -> P<ast::Expr> {
 }
 
 
-fn emit_repeated(cx: &mut ExtCtxt, sp: Span, value: Value<P<ast::Expr>>, parent: P<ast::Expr>) -> ast::Stmt {
-    let e = match value {
-        Value::SingleValue(expr) => {
-            let f_push = cx.ident_of("push");
-            let expr = convert_single_value(cx, expr);
-
-            cx.expr_method_call(
-                sp,
-                parent,
-                f_push,
-                vec![expr])
-        },
-        Value::MessageValue(msg) => {
-            let f_push_default = cx.ident_of("push_default");
-            let e_push_default = cx.expr_method_call(
-                sp,
-                parent,
-                f_push_default,
-                Vec::new());
-
-            emit_message(cx, sp, msg, e_push_default)
-        },
-        Value::RepeatedValue(_) => panic!("Cannot nest repeated fields")
-    };
-
-    cx.stmt_expr(e)
-}
-
-fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field<P<ast::Expr>>, parent: P<ast::Expr>) -> P<ast::Expr> {
-    let Field(key, value) = field;
+fn emit_repeated_field(sp: Span,
+                       parent: P<ast::Expr>,
+                       value: Value<P<ast::Expr>>) -> ast::Stmt {
 
     match value {
         Value::SingleValue(expr) => {
-            let expr = convert_single_value(cx, expr);
-            util::field_set(cx, parent, &key, expr)
+            let expr = convert_single_value(expr);
+            StmtBuilder::new().expr()
+                        .method_call("push").build(parent)
+                        .arg().build(expr)
+                        .build()
         },
         Value::MessageValue(msg) => {
-            let e_msg = util::field_get(cx, parent, &key, true);
-            emit_message(cx, sp, msg, e_msg)
+            let msg_expr = ExprBuilder::new()
+                                       .method_call("push_default").build(parent)
+                                       .build();
+
+            StmtBuilder::new().semi().build(emit_message(sp, msg_expr, msg))
+        },
+        Value::RepeatedValue(_) => panic!("Cannot nest repeated fields")
+    }
+}
+
+fn emit_field(sp: Span,
+              parent: P<ast::Expr>,
+              Field(key, value): Field<P<ast::Expr>>) -> ast::Stmt {
+
+    match value {
+        Value::SingleValue(expr) => {
+            let expr = convert_single_value(expr);
+            util::field_set(parent, &key, expr)
+        },
+        Value::MessageValue(msg) => {
+            let msg_expr = util::field_get(parent, &key, true);
+            StmtBuilder::new().semi().build(emit_message(sp, msg_expr, msg))
         },
         Value::RepeatedValue(values) => {
-            let mut stmts = Vec::new();
+            let mut builder = StmtBuilder::new().semi().block();
 
-            let i_repeated = cx.ident_of("repeated");
-            let e_repeated = cx.expr_ident(sp, i_repeated);
+            if values.len() > 0 {
+                builder = builder.stmt()
+                                 .let_id("repeated")
+                                 .build(util::field_get(parent, &key, true));
 
-            let e_mut_xxx = util::field_get(cx, parent, &key, true);
-            stmts.push(cx.stmt_let(sp, true, i_repeated, e_mut_xxx));
+                let e_repeated = ExprBuilder::new().id("repeated");
 
-            for v in values {
-                stmts.push(emit_repeated(cx, sp, v, e_repeated.clone()))
+                for v in values {
+                    let stmt = emit_repeated_field(sp, e_repeated.clone(), v);
+                    builder = builder.with_stmt(stmt);
+                }
             }
-            let block = cx.block(sp, stmts, None);
-            cx.expr_block(block)
+
+            builder.build()
         },
     }
 }
 
-fn emit_message(cx: &mut ExtCtxt, sp: Span, msg: Message<P<ast::Expr>>, expr: P<ast::Expr>) -> P<ast::Expr>{
-    let Message(fields) = msg;
+fn emit_message(sp: Span,
+                expr: P<ast::Expr>,
+                Message(fields): Message<P<ast::Expr>>) -> P<ast::Expr> {
+
     if fields.len() > 0 {
-        let i_msg = cx.ident_of("msg");
-        let e_msg = cx.expr_ident(sp, i_msg);
+        let mut builder = ExprBuilder::new().block();
+        builder = builder.stmt().let_().mut_id("msg")
+                                .expr().build(expr);
 
-        let mut stmts = Vec::new();
-        stmts.push(cx.stmt_let(sp, true, i_msg, expr));
+        let e_msg = ExprBuilder::new().id("msg");
 
-        for f in fields {
-            let e_field = emit_field(cx, sp, f, e_msg.clone());
-            stmts.push(cx.stmt_expr(e_field));
+        for field in fields {
+            let stmt = emit_field(sp, e_msg.clone(), field);
+            builder = builder.with_stmt(stmt);
         }
 
-        let block = cx.block(sp, stmts, Some(e_msg));
-        cx.expr_block(block)
+        builder.expr().build(e_msg)
     } else {
         expr
     }
 }
 
-pub fn macro_protobuf_init(cx: &mut ExtCtxt, sp: Span, tts: &[ast::TokenTree]) -> Box<MacResult+'static> {
+pub fn macro_protobuf_init(cx: &mut ExtCtxt,
+                           sp: Span,
+                           tts: &[ast::TokenTree]) -> Box<MacResult+'static> {
     match parse_protobuf(cx, tts) {
         Ok((expr, msg)) => {
             MacEager::expr(
-                emit_message(cx, sp, msg, expr)
+                emit_message(sp, expr, msg)
             )
         }
         Err(_) => {

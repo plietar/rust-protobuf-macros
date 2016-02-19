@@ -9,7 +9,8 @@ use syntax::ptr::P;
 use syntax::util::small_vector::SmallVector;
 
 use util;
-use util::{Value, Field, Message, RHSParser, ParserExt, AstBuilderExt};
+use util::AstBuilderExt;
+use parser::{Value, Field, Message, MacroParser, RHSParser, ParserExt};
 
 struct IdentParser;
 impl RHSParser for IdentParser {
@@ -21,7 +22,7 @@ impl RHSParser for IdentParser {
 
 fn parse_protobuf<'a>(cx: &mut ExtCtxt<'a>, tts: &[ast::TokenTree]) -> PResult<'a, (P<ast::Expr>, Message<Spanned<ast::Ident>>)> {
     let mut parser = cx.new_parser_from_tts(&tts.to_vec());
-    util::MacroParser::new(&mut parser, IdentParser).parse_macro()
+    MacroParser::new(&mut parser, IdentParser).parse_macro()
 }
 
 fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field<Spanned<ast::Ident>>, parent: P<ast::Expr>) -> (P<ast::Pat>, P<ast::Expr>) {
@@ -31,7 +32,7 @@ fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field<Spanned<ast::Ident>>, par
         Value::SingleValue(ident) => {
             let pat = cx.pat_ident(ident.span, ident.node);
 
-            let e = util::field_get(cx, parent, &key, false);
+            let e = util::field_get(parent, &key, false);
 
             (pat, e)
         },
@@ -39,7 +40,7 @@ fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field<Spanned<ast::Ident>>, par
             let i_msg = cx.ident_of("msg");
             let e_msg = cx.expr_ident(sp, i_msg);
 
-            let e = util::field_get(cx, parent, &key, false);
+            let e = util::field_get(parent, &key, false);
 
             let stmts = vec![
                 cx.stmt_let(sp, false, i_msg, e)
