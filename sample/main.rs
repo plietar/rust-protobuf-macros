@@ -9,25 +9,25 @@ use addressbook::{Person, Person_PhoneType};
 
 fn main() {
     let person = protobuf_init!(Person::new(), {
-        name: "Joe".to_string(),
+        name: "Joe",
         id: 42,
         email => [
-            "joe@domain.com".to_string(),
-            "joe@other.com".to_string()
+            "joe@domain.com",
+            "joe@other.com"
         ],
         phone => [
             @{
-                number: "0123456789".to_string(),
+                number: "0123456789",
                 field_type: Person_PhoneType::HOME
             },
             @{
-                number: "9876543210".to_string(),
+                number: "9876543210",
                 field_type: Person_PhoneType::WORK
             }
         ],
         job => {
-            title: "Boss".to_string(),
-            company: "Big Corp".to_string()
+            title: "Boss",
+            company: "Big Corp"
         }
     });
 
