@@ -7,6 +7,7 @@ use syntax::parse::PResult;
 use syntax::parse::parser::Parser;
 use syntax::ptr::P;
 use syntax::util::small_vector::SmallVector;
+use syntax::parse::token::gensym_ident;
 
 use util;
 use util::AstBuilderExt;
@@ -37,7 +38,7 @@ fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field<Spanned<ast::Ident>>, par
             (pat, e)
         },
         Value::MessageValue(msg) => {
-            let i_msg = cx.ident_of("msg");
+            let i_msg = gensym_ident("msg");
             let e_msg = cx.expr_ident(sp, i_msg);
 
             let e = util::field_get(parent, &key, false);

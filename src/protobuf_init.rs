@@ -8,6 +8,7 @@ use syntax::ext::build::AstBuilder;
 use syntax::parse::PResult;
 use syntax::parse::parser::Parser;
 use syntax::ptr::P;
+use syntax::parse::token::gensym_ident;
 
 use util;
 use parser::{Value, Field, Message, MacroParser, RHSParser};
@@ -90,11 +91,12 @@ fn emit_field(sp: Span,
             let mut builder = StmtBuilder::new().semi().block();
 
             if values.len() > 0 {
-                builder = builder.stmt()
-                                 .let_id("repeated")
-                                 .build(util::field_get(parent, &key, true));
+                let i_repeated = gensym_ident("repeated");
+                let e_repeated = ExprBuilder::new().id(i_repeated);
 
-                let e_repeated = ExprBuilder::new().id("repeated");
+                builder = builder.stmt()
+                                 .let_id(i_repeated)
+                                 .build(util::field_get(parent, &key, true));
 
                 for v in values {
                     let stmt = emit_repeated_field(sp, e_repeated.clone(), v);
@@ -113,10 +115,12 @@ fn emit_message(sp: Span,
 
     if fields.len() > 0 {
         let mut builder = ExprBuilder::new().block();
-        builder = builder.stmt().let_().mut_id("msg")
-                                .expr().build(expr);
 
-        let e_msg = ExprBuilder::new().id("msg");
+        let i_msg = gensym_ident("msg");
+        let e_msg = ExprBuilder::new().id(i_msg);
+
+        builder = builder.stmt().let_().mut_id(i_msg)
+                                .expr().build(expr);
 
         for field in fields {
             let stmt = emit_field(sp, e_msg.clone(), field);
