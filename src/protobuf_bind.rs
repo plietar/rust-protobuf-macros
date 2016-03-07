@@ -72,7 +72,9 @@ fn emit_message(cx: &mut ExtCtxt, sp: Span, msg: Message<Spanned<ast::Ident>>, e
     (cx.pat_tuple(sp, pats), cx.expr_tuple(sp, values))
 }
 
-pub fn macro_protobuf_bind(cx: &mut ExtCtxt, sp: Span, tts: &[ast::TokenTree]) -> Box<MacResult+'static> {
+pub fn macro_protobuf_bind<'a>(cx: &mut ExtCtxt,
+                               sp: Span,
+                               tts: &[ast::TokenTree]) -> Box<MacResult+'a> {
     match parse_protobuf(cx, tts) {
         Ok((expr, msg)) => {
             let (pat, value) = emit_message(cx, sp, msg, expr);

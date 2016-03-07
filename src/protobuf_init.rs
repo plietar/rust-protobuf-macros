@@ -133,9 +133,9 @@ fn emit_message(sp: Span,
     }
 }
 
-pub fn macro_protobuf_init(cx: &mut ExtCtxt,
-                           sp: Span,
-                           tts: &[ast::TokenTree]) -> Box<MacResult+'static> {
+pub fn macro_protobuf_init<'a>(cx: &mut ExtCtxt,
+                               sp: Span,
+                               tts: &[ast::TokenTree]) -> Box<MacResult+'a> {
     match parse_protobuf(cx, tts) {
         Ok((expr, msg)) => {
             MacEager::expr(

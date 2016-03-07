@@ -8,6 +8,12 @@ name = "protobuf_macros"
 path = "src/lib.rs"
 plugin = true
 test = false
+crate-type = ["dylib", "rlib"]
 
-[dependencies.aster]
-version = "^0.13.1"
+[dependencies]
+aster = "^0.13.1"
+syntex = { version = "*", optional = true }
+syntex_syntax = { version = "*", optional = true }
+
+[features]
+with-syntex = ["syntex", "syntex_syntax", "aster/with-syntex"]
