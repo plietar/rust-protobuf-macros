@@ -71,8 +71,13 @@ pub fn field_set(parent: P<ast::Expr>,
 
     let (ident, parent) = match key.split_last() {
         None => panic!("At least one ident is required"),
-        Some((ident, [])) => (ident, parent),
-        Some((ident, path)) => (ident, field_get(parent, path, true))
+        Some((ident, path)) => {
+            if path.is_empty() {
+                (ident, parent)
+            } else {
+                (ident, field_get(parent, path, true))
+            }
+        }
     };
 
     let accessor = field_accessor(ident, Accessor::Set);

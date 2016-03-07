@@ -1,4 +1,3 @@
-#![feature(slice_patterns)]
 #![cfg_attr(not(feature = "with-syntex"), feature(plugin_registrar, rustc_private))]
 
 extern crate aster;
