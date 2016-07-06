@@ -3,34 +3,13 @@ use aster::expr::ExprBuilder;
 use aster::ident::ToIdent;
 
 use syntax::ast;
-use syntax::codemap::{Spanned, Span, respan};
+use syntax::codemap::{Spanned, respan};
 use syntax::ptr::P;
-use syntax::ext::build::AstBuilder;
 
 enum Accessor {
     Get,
     Mut,
     Set
-}
-
-pub trait AstBuilderExt {
-    fn stmt_let_pat(&self, sp: Span, pat: P<ast::Pat>, ex: P<ast::Expr>) -> ast::Stmt;
-}
-
-impl <T : AstBuilder> AstBuilderExt for T {
-    fn stmt_let_pat(&self, sp: Span, pat: P<ast::Pat>, ex: P<ast::Expr>) -> ast::Stmt {
-        let local = P(ast::Local {
-            pat: pat,
-            ty: None,
-            init: Some(ex),
-            id: ast::DUMMY_NODE_ID,
-            span: sp,
-            attrs: None,
-        });
-
-        let decl = respan(sp, ast::DeclKind::Local(local));
-        respan(sp, ast::StmtKind::Decl(P(decl), ast::DUMMY_NODE_ID))
-    }
 }
 
 fn field_accessor(ident: &Spanned<ast::Ident>, mode: Accessor) -> Spanned<ast::Ident> {

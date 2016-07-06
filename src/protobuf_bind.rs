@@ -8,10 +8,12 @@ use syntax::parse::parser::Parser;
 use syntax::ptr::P;
 use syntax::util::small_vector::SmallVector;
 use syntax::parse::token::gensym_ident;
+use syntax::tokenstream::TokenTree;
 
 use util;
-use util::AstBuilderExt;
 use parser::{Value, Field, Message, MacroParser, RHSParser, ParserExt};
+
+use aster::stmt::StmtBuilder;
 
 struct IdentParser;
 impl RHSParser for IdentParser {
@@ -21,7 +23,7 @@ impl RHSParser for IdentParser {
     }
 }
 
-fn parse_protobuf<'a>(cx: &mut ExtCtxt<'a>, tts: &[ast::TokenTree]) -> PResult<'a, (P<ast::Expr>, Message<Spanned<ast::Ident>>)> {
+fn parse_protobuf<'a>(cx: &mut ExtCtxt<'a>, tts: &[TokenTree]) -> PResult<'a, (P<ast::Expr>, Message<Spanned<ast::Ident>>)> {
     let mut parser = cx.new_parser_from_tts(&tts.to_vec());
     MacroParser::new(&mut parser, IdentParser).parse_macro()
 }
@@ -43,12 +45,14 @@ fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field<Spanned<ast::Ident>>, par
 
             let e = util::field_get(parent, &key, false);
 
-            let stmts = vec![
-                cx.stmt_let(sp, false, i_msg, e)
-            ];
             let (pat, value) = emit_message(cx, sp, msg, e_msg);
 
-            let block = cx.block(sp, stmts, Some(value));
+            let stmts = vec![
+                cx.stmt_let(sp, false, i_msg, e),
+                cx.stmt_expr(value),
+            ];
+
+            let block = cx.block(sp, stmts);
 
             (pat, cx.expr_block(block))
         },
@@ -72,14 +76,14 @@ fn emit_message(cx: &mut ExtCtxt, sp: Span, msg: Message<Spanned<ast::Ident>>, e
     (cx.pat_tuple(sp, pats), cx.expr_tuple(sp, values))
 }
 
-pub fn macro_protobuf_bind<'a>(cx: &mut ExtCtxt,
+pub fn macro_protobuf_bind<'a>(cx: &'a mut ExtCtxt,
                                sp: Span,
-                               tts: &[ast::TokenTree]) -> Box<MacResult+'a> {
+                               tts: &[TokenTree]) -> Box<MacResult+'a> {
     match parse_protobuf(cx, tts) {
         Ok((expr, msg)) => {
             let (pat, value) = emit_message(cx, sp, msg, expr);
             MacEager::stmts(SmallVector::one(
-                cx.stmt_let_pat(sp, pat, value)
+                StmtBuilder::new().build_let(pat, None, Some(value))
             ))
         }
         Err(_) => {

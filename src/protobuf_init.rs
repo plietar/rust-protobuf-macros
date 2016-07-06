@@ -4,11 +4,11 @@ use aster::stmt::StmtBuilder;
 use syntax::ast;
 use syntax::codemap::Span;
 use syntax::ext::base::{ExtCtxt, MacResult, MacEager, DummyResult};
-use syntax::ext::build::AstBuilder;
 use syntax::parse::PResult;
 use syntax::parse::parser::Parser;
 use syntax::ptr::P;
 use syntax::parse::token::gensym_ident;
+use syntax::tokenstream::TokenTree;
 
 use util;
 use parser::{Value, Field, Message, MacroParser, RHSParser};
@@ -22,7 +22,7 @@ impl RHSParser for ExprParser {
 }
 
 fn parse_protobuf<'a>(cx: &mut ExtCtxt<'a>,
-                      tts: &[ast::TokenTree]) -> PResult<'a, (P<ast::Expr>, Message<P<ast::Expr>>)> {
+                      tts: &[TokenTree]) -> PResult<'a, (P<ast::Expr>, Message<P<ast::Expr>>)> {
 
     let mut parser = cx.new_parser_from_tts(&tts.to_vec());
     MacroParser::new(&mut parser, ExprParser).parse_macro()
@@ -133,9 +133,9 @@ fn emit_message(sp: Span,
     }
 }
 
-pub fn macro_protobuf_init<'a>(cx: &mut ExtCtxt,
+pub fn macro_protobuf_init<'a>(cx: &'a mut ExtCtxt,
                                sp: Span,
-                               tts: &[ast::TokenTree]) -> Box<MacResult+'a> {
+                               tts: &[TokenTree]) -> Box<MacResult+'a> {
     match parse_protobuf(cx, tts) {
         Ok((expr, msg)) => {
             MacEager::expr(
