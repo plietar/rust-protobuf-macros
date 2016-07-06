@@ -24,8 +24,12 @@ pub fn plugin_registrar(reg: &mut Registry) {
 }
 
 #[cfg(feature = "with-syntex")]
-pub fn plugin_registrar(reg: &mut Registry) {
-    reg.add_macro("protobuf_init", protobuf_init::macro_protobuf_init);
-    reg.add_macro("protobuf_bind", protobuf_bind::macro_protobuf_bind);
+pub fn expand<S, D>(src: S, dst: D) -> Result<(), syntex::Error>
+    where S: AsRef<std::path::Path>,
+          D: AsRef<std::path::Path>,
+{
+    let mut registry = Registry::new();
+    registry.add_macro("protobuf_init", protobuf_init::macro_protobuf_init);
+    registry.add_macro("protobuf_bind", protobuf_bind::macro_protobuf_bind);
+    registry.expand("", src.as_ref(), dst.as_ref())
 }
-
