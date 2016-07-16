@@ -5,9 +5,7 @@ The macros use [stepancheg/rust-protobuf](https://github.com/stepancheg/rust-pro
 but provide a simpler syntax to set and get fields from protobuf objects.
 
 ## Installation
-The macros are implemented using a compiler plugin, which requires rust nightly.
-rust beta will NOT work !
-
+### Rust nightly
 Add to your `Cargo.toml`
 ```toml
 [dependencies.protobuf]
@@ -20,6 +18,29 @@ Then enable it in your crate :
 ```rust
 #![feature(plugin)]
 #![plugin(protobuf_macros)]
+```
+
+### Rust stable
+The plugin can be used on rust stable using [syntex](https://github.com/serde-rs/syntex) :
+
+Add to your `Cargo.toml` :
+```toml
+[dependencies.protobuf]
+git = "https://github.com/stepancheg/rust-protobuf.git"
+[build-dependencies.protobuf_macros]
+git = "https://github.com/plietar/rust-protobuf-macros.git"
+```
+
+And add a build script :
+```rust
+extern crate protobuf_macros;
+use std::env;
+use std::path::PathBuf;
+
+fn main() {
+  let out = PathBuf::from(env::var("OUT_DIR").unwrap());
+  protobuf_macros::expand("src/lib.in.rs", &out.join("lib.rs")).unwrap();
+}
 ```
 
 ## Usage
