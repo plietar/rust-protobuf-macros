@@ -11,9 +11,9 @@ test = false
 crate-type = ["dylib", "rlib"]
 
 [dependencies]
-aster         = "^0.21.1"
-syntex        = { version = "^0.38.0", optional = true }
-syntex_syntax = { version = "^0.38.0", optional = true }
+aster         = "0.31.0"
+syntex        = { version = "0.46.0", optional = true }
+syntex_syntax = { version = "0.46.0", optional = true }
 
 [features]
 with-syntex = ["syntex", "syntex_syntax", "aster/with-syntex"]

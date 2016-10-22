@@ -83,7 +83,7 @@ pub fn macro_protobuf_bind<'a>(cx: &'a mut ExtCtxt,
         Ok((expr, msg)) => {
             let (pat, value) = emit_message(cx, sp, msg, expr);
             MacEager::stmts(SmallVector::one(
-                StmtBuilder::new().build_let(pat, None, Some(value))
+                StmtBuilder::new().build_let(pat, None, Some(value), vec![])
             ))
         }
         Err(_) => {

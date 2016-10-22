@@ -96,7 +96,7 @@ fn emit_field(sp: Span,
 
                 builder = builder.stmt()
                                  .let_id(i_repeated)
-                                 .build(util::field_get(parent, &key, true));
+                                 .build_expr(util::field_get(parent, &key, true));
 
                 for v in values {
                     let stmt = emit_repeated_field(sp, e_repeated.clone(), v);
