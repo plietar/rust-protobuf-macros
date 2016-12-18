@@ -2,12 +2,13 @@ use aster::expr::ExprBuilder;
 use aster::stmt::StmtBuilder;
 
 use syntax::ast;
+use syntax::ast::Ident;
 use syntax::codemap::Span;
 use syntax::ext::base::{ExtCtxt, MacResult, MacEager, DummyResult};
 use syntax::parse::PResult;
 use syntax::parse::parser::Parser;
 use syntax::ptr::P;
-use syntax::parse::token::gensym_ident;
+use syntax::symbol::Symbol;
 use syntax::tokenstream::TokenTree;
 
 use util;
@@ -91,7 +92,7 @@ fn emit_field(sp: Span,
             let mut builder = StmtBuilder::new().semi().block();
 
             if values.len() > 0 {
-                let i_repeated = gensym_ident("repeated");
+                let i_repeated = Ident::with_empty_ctxt(Symbol::gensym("repeated"));
                 let e_repeated = ExprBuilder::new().id(i_repeated);
 
                 builder = builder.stmt()
@@ -116,7 +117,7 @@ fn emit_message(sp: Span,
     if fields.len() > 0 {
         let mut builder = ExprBuilder::new().block();
 
-        let i_msg = gensym_ident("msg");
+        let i_msg = Ident::with_empty_ctxt(Symbol::gensym("msg"));
         let e_msg = ExprBuilder::new().id(i_msg);
 
         builder = builder.stmt().let_().mut_id(i_msg)
