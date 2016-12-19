@@ -1,13 +1,14 @@
 use std::clone::Clone;
 use syntax::ast;
+use syntax::ast::Ident;
 use syntax::codemap::{Span, Spanned};
 use syntax::ext::base::{ExtCtxt, MacResult, MacEager, DummyResult};
 use syntax::ext::build::AstBuilder;
 use syntax::parse::PResult;
 use syntax::parse::parser::Parser;
 use syntax::ptr::P;
+use syntax::symbol::Symbol;
 use syntax::util::small_vector::SmallVector;
-use syntax::parse::token::gensym_ident;
 use syntax::tokenstream::TokenTree;
 
 use util;
@@ -40,7 +41,7 @@ fn emit_field(cx: &mut ExtCtxt, sp: Span, field: Field<Spanned<ast::Ident>>, par
             (pat, e)
         },
         Value::MessageValue(msg) => {
-            let i_msg = gensym_ident("msg");
+            let i_msg = Ident::with_empty_ctxt(Symbol::gensym("msg"));
             let e_msg = cx.expr_ident(sp, i_msg);
 
             let e = util::field_get(parent, &key, false);
